@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tech Tutorials Hub</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-content">
+      <h1>Tech Tutorials Hub</h1>
+      <p>
+        Share technical tutorials with steps, explanations, code examples,
+        ratings, and comments.
+      </p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel form-panel">
+      <h2>Create Tutorial</h2>
+
+      <form id="tutorialForm" class="tutorial-form">
+        <div class="field">
+          <label for="title">Tutorial Title</label>
+          <input type="text" id="title" placeholder="e.g. Build a REST API with Node.js" required />
+        </div>
+
+        <div class="field">
+          <label for="author">Author Name</label>
+          <input type="text" id="author" placeholder="Your name" required />
+        </div>
+
+        <div class="field">
+          <label for="explanation">Explanation</label>
+          <textarea id="explanation" rows="4" placeholder="Write a short explanation of the tutorial..." required></textarea>
+        </div>
+
+        <div class="field">
+          <label for="steps">Steps</label>
+          <textarea id="steps" rows="6" placeholder="Enter one step per line..." required></textarea>
+        </div>
+
+        <div class="field">
+          <label for="code">Code Example</label>
+          <textarea id="code" rows="8" placeholder="Paste your code example here..." required></textarea>
+        </div>
+
+        <button type="submit" class="primary-btn">Publish Tutorial</button>
+      </form>
+    </section>
+
+    <section class="panel tutorials-panel">
+      <div class="section-head">
+        <div>
+          <h2>Community Tutorials</h2>
+          <p>Highly rated tutorials are highlighted.</p>
+        </div>
+      </div>
+
+      <div id="tutorialList" class="tutorial-list"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
