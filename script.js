@@ -1,109 +1,26 @@
-const tutorialForm = document.getElementById("tutorialForm");
-const tutorialList = document.getElementById("tutorialList");
+// script.js
+// ─── All DOM interaction and backend integration ───────────────────────────────
 
+// ─── Constants ────────────────────────────────────────────────────────────────
 const HIGH_RATING_THRESHOLD = 4.5;
 const MIN_RATINGS_FOR_HIGHLIGHT = 2;
-const STORAGE_KEY = "tech_tutorials_frontend_only";
 
-const sampleTutorials = [
-  {
-    id: "t1",
-    title: "Getting Started with JavaScript Arrays",
-    author: "Aarav",
-    explanation:
-      "This tutorial explains how to create arrays, add items, and use common array methods in JavaScript.",
-    steps: [
-      "Create an array using square brackets.",
-      "Access items using their index position.",
-      "Use push() to add new values at the end.",
-      "Use map() to transform array items."
-    ],
-    code:
-`const numbers = [1, 2, 3];
-numbers.push(4);
+// ─── Element references ───────────────────────────────────────────────────────
+const tutorialForm  = document.getElementById("tutorialForm");
+const tutorialList  = document.getElementById("tutorialList");
+const authBar       = document.getElementById("authBar");
+const authModal     = document.getElementById("authModal");
+const modalOverlay  = document.getElementById("modalOverlay");
+const modalClose    = document.getElementById("modalClose");
+const loginForm     = document.getElementById("loginForm");
+const registerForm  = document.getElementById("registerForm");
+const loginNotice   = document.getElementById("loginNotice");
+const loginPromptBtn= document.getElementById("loginPromptBtn");
+const formError     = document.getElementById("formError");
 
-const doubled = numbers.map(num => num * 2);
-
-console.log(numbers); // [1, 2, 3, 4]
-console.log(doubled); // [2, 4, 6, 8]`,
-    ratings: [5, 5, 4, 5],
-    comments: [
-      {
-        name: "Nina",
-        text: "Very clear explanation and easy to understand.",
-        date: "2026-04-20"
-      },
-      {
-        name: "Rahul",
-        text: "Helpful example for beginners.",
-        date: "2026-04-21"
-      }
-    ]
-  },
-  {
-    id: "t2",
-    title: "Basic HTML Form Validation",
-    author: "Meera",
-    explanation:
-      "Learn how to validate forms with HTML required fields and simple JavaScript checks.",
-    steps: [
-      "Create form fields with labels.",
-      "Use the required attribute for mandatory inputs.",
-      "Listen for form submission in JavaScript.",
-      "Show a message when validation fails."
-    ],
-    code:
-`const form = document.querySelector("form");
-
-form.addEventListener("submit", (e) => {
-  const email = document.getElementById("email").value.trim();
-
-  if (!email.includes("@")) {
-    e.preventDefault();
-    alert("Please enter a valid email.");
-  }
-});`,
-    ratings: [4, 4, 3],
-    comments: [
-      {
-        name: "Sara",
-        text: "Good intro, maybe add regex validation too.",
-        date: "2026-04-22"
-      }
-    ]
-  }
-];
-
-let tutorials = loadTutorials();
-
-function loadTutorials() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    return JSON.parse(saved);
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleTutorials));
-  return sampleTutorials;
-}
-
-function saveTutorials() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tutorials));
-}
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function getAverageRating(ratings = []) {
-  if (!ratings.length) return 0;
-  return ratings.reduce((sum, value) => sum + value, 0) / ratings.length;
-}
-
-function renderStars(avg) {
-  const rounded = Math.round(avg);
-  return Array.from({ length: 5 }, (_, i) => {
-    return `<span class="display-star ${i < rounded ? "filled" : ""}">★</span>`;
-  }).join("");
-}
+// ─────────────────────────────────────────────────────────────────────────────
+//  UTILITIES
+// ─────────────────────────────────────────────────────────────────────────────
 
 function escapeHtml(value = "") {
   return String(value)
@@ -114,174 +31,396 @@ function escapeHtml(value = "") {
     .replace(/'/g, "&#039;");
 }
 
-function renderTutorials() {
-  const sortedTutorials = [...tutorials].sort(
-    (a, b) => getAverageRating(b.ratings) - getAverageRating(a.ratings)
-  );
+function renderStars(avg) {
+  const rounded = Math.round(avg);
+  return Array.from({ length: 5 }, (_, i) =>
+    `<span class="display-star ${i < rounded ? "filled" : ""}">★</span>`
+  ).join("");
+}
 
-  if (!sortedTutorials.length) {
-    tutorialList.innerHTML = `<p class="empty-text">No tutorials available.</p>`;
+function showError(el, message) {
+  el.textContent = message;
+  el.classList.remove("hidden");
+}
+
+function clearError(el) {
+  el.textContent = "";
+  el.classList.add("hidden");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  AUTH UI
+// ─────────────────────────────────────────────────────────────────────────────
+
+// FIX: renderAuthBar() keeps the header in sync with auth state.
+//      The original app had no auth UI at all.
+function renderAuthBar() {
+  if (isLoggedIn()) {
+    const user = getCurrentUser();
+    authBar.innerHTML = `
+      <span class="auth-greeting">👋 ${escapeHtml(user?.name || "")}</span>
+      <button class="auth-btn outline" id="logoutBtn">Log Out</button>
+    `;
+    document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+    tutorialForm.classList.remove("hidden");
+    loginNotice.classList.add("hidden");
+  } else {
+    authBar.innerHTML = `
+      <button class="auth-btn" id="openLoginBtn">Log In / Register</button>
+    `;
+    document.getElementById("openLoginBtn").addEventListener("click", () => openModal("login"));
+    tutorialForm.classList.add("hidden");
+    loginNotice.classList.remove("hidden");
+  }
+}
+
+// ─── Modal open / close ───────────────────────────────────────────────────────
+
+function openModal(tab = "login") {
+  switchTab(tab);
+  authModal.classList.remove("hidden");
+  modalOverlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeModal() {
+  authModal.classList.add("hidden");
+  modalOverlay.classList.add("hidden");
+  document.body.style.overflow = "";
+  clearError(document.getElementById("loginError"));
+  clearError(document.getElementById("registerError"));
+  loginForm.reset();
+  registerForm.reset();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  loginForm.classList.toggle("hidden", tab !== "login");
+  registerForm.classList.toggle("hidden", tab !== "register");
+}
+
+modalClose.addEventListener("click", closeModal);
+modalOverlay.addEventListener("click", closeModal);
+loginPromptBtn.addEventListener("click", () => openModal("login"));
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// ─── Login submit ──────────────────────────────────────────────────────────────
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const loginError = document.getElementById("loginError");
+  clearError(loginError);
+
+  const email    = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+
+  try {
+    await loginUser(email, password);
+    closeModal();
+    renderAuthBar();
+    loadTutorials(); // Refresh so like/rate buttons reflect logged-in state
+  } catch (err) {
+    showError(loginError, err.message);
+  }
+});
+
+// ─── Register submit ───────────────────────────────────────────────────────────
+registerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const registerError = document.getElementById("registerError");
+  clearError(registerError);
+
+  const name     = document.getElementById("regName").value.trim();
+  const email    = document.getElementById("regEmail").value.trim();
+  const password = document.getElementById("regPassword").value;
+
+  try {
+    await registerUser(name, email, password);
+    closeModal();
+    renderAuthBar();
+    loadTutorials();
+  } catch (err) {
+    showError(registerError, err.message);
+  }
+});
+
+// ─── Logout ────────────────────────────────────────────────────────────────────
+async function handleLogout() {
+  await logoutUser();
+  renderAuthBar();
+  loadTutorials();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  RENDER TUTORIALS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderTutorials(tutorials) {
+  if (!tutorials || !tutorials.length) {
+    tutorialList.innerHTML = `<p class="empty-text">No tutorials yet — be the first to publish one!</p>`;
     return;
   }
 
-  tutorialList.innerHTML = sortedTutorials
-    .map((tutorial) => {
-      const avg = getAverageRating(tutorial.ratings);
-      const isHighlyRated =
-        avg >= HIGH_RATING_THRESHOLD &&
-        tutorial.ratings.length >= MIN_RATINGS_FOR_HIGHLIGHT;
+  // Sort by averageRating descending
+  const sorted = [...tutorials].sort((a, b) =>
+    (b.averageRating || 0) - (a.averageRating || 0)
+  );
 
-      return `
-        <article class="tutorial-card ${isHighlyRated ? "highlighted" : ""}" data-id="${tutorial.id}">
-          <div class="card-top">
-            <div>
-              <h3>${escapeHtml(tutorial.title)}</h3>
-              <p class="author">By ${escapeHtml(tutorial.author)}</p>
-            </div>
-            ${isHighlyRated ? `<span class="badge">Highly Rated</span>` : ""}
-          </div>
+  tutorialList.innerHTML = sorted.map((t) => {
+    const avg           = t.averageRating || 0;
+    const totalRatings  = t.ratings?.length || 0;
+    const totalLikes    = t.likes?.length || 0;
+    const isHighlighted = avg >= HIGH_RATING_THRESHOLD && totalRatings >= MIN_RATINGS_FOR_HIGHLIGHT;
 
-          <div class="block">
-            <h4>Explanation</h4>
-            <p>${escapeHtml(tutorial.explanation)}</p>
-          </div>
+    // FIX: steps now comes from the backend as an array (no .split() needed)
+    const stepsHtml = (t.steps || [])
+      .map((s) => `<li>${escapeHtml(s)}</li>`)
+      .join("");
 
-          <div class="block">
-            <h4>Steps</h4>
-            <ol>
-              ${tutorial.steps
-                .map((step) => `<li>${escapeHtml(step)}</li>`)
-                .join("")}
-            </ol>
-          </div>
-
-          <div class="block">
-            <h4>Code Example</h4>
-            <pre><code>${escapeHtml(tutorial.code)}</code></pre>
-          </div>
-
-          <div class="rating-summary">
-            <span class="avg-number">${avg ? avg.toFixed(1) : "0.0"}/5</span>
-            <div class="display-stars">${renderStars(avg)}</div>
-            <span>${tutorial.ratings.length} rating(s)</span>
-          </div>
-
-          <div class="vote-row">
-            <p>Rate this tutorial:</p>
-            <div class="star-buttons">
-              <button type="button" class="star-btn" data-id="${tutorial.id}" data-rate="1">★ 1</button>
-              <button type="button" class="star-btn" data-id="${tutorial.id}" data-rate="2">★ 2</button>
-              <button type="button" class="star-btn" data-id="${tutorial.id}" data-rate="3">★ 3</button>
-              <button type="button" class="star-btn" data-id="${tutorial.id}" data-rate="4">★ 4</button>
-              <button type="button" class="star-btn" data-id="${tutorial.id}" data-rate="5">★ 5</button>
-            </div>
-          </div>
-
-          <div class="comments">
-            <h4>Comments</h4>
-
-            <div class="comment-list">
+    const commentsHtml = (t.comments || []).length
+      ? (t.comments || []).map((c) => `
+          <div class="comment-item" data-comment-id="${c._id}">
+            <strong>${escapeHtml(c.name)}</strong>
+            <p>${escapeHtml(c.text)}</p>
+            <div class="comment-meta">
+              <span class="comment-date">${new Date(c.createdAt).toLocaleDateString()}</span>
               ${
-                tutorial.comments.length
-                  ? tutorial.comments
-                      .map(
-                        (comment) => `
-                      <div class="comment-item">
-                        <strong>${escapeHtml(comment.name)}</strong>
-                        <p>${escapeHtml(comment.text)}</p>
-                        <div class="comment-date">${escapeHtml(comment.date)}</div>
-                      </div>
-                    `
-                      )
-                      .join("")
-                  : `<p class="empty-text">No comments yet.</p>`
+                // FIX: Show delete button only for the comment's own author
+                isLoggedIn() && getCurrentUser()?.id === c.user
+                  ? `<button class="del-comment-btn" data-tutorial-id="${t._id}" data-comment-id="${c._id}">Delete</button>`
+                  : ""
               }
             </div>
-
-            <div class="comment-form">
-              <input type="text" class="commenter-name" placeholder="Your name" />
-              <textarea class="comment-text" rows="3" placeholder="Write a comment..."></textarea>
-              <button type="button" class="comment-btn" data-id="${tutorial.id}">
-                Post Comment
-              </button>
-            </div>
           </div>
-        </article>
-      `;
-    })
-    .join("");
+        `).join("")
+      : `<p class="empty-text">No comments yet.</p>`;
+
+    // FIX: Show edit/delete only to the tutorial's author
+    const isAuthor = isLoggedIn() && getCurrentUser()?.id === t.author;
+
+    return `
+      <article class="tutorial-card ${isHighlighted ? "highlighted" : ""}" data-id="${t._id}">
+        <div class="card-top">
+          <div>
+            <h3>${escapeHtml(t.title)}</h3>
+            <p class="author">By ${escapeHtml(t.authorName)}</p>
+          </div>
+          <div class="card-top-right">
+            ${isHighlighted ? `<span class="badge">⭐ Highly Rated</span>` : ""}
+            ${isAuthor ? `
+              <button class="icon-btn delete-btn" data-id="${t._id}" title="Delete tutorial">🗑</button>
+            ` : ""}
+          </div>
+        </div>
+
+        <div class="block">
+          <h4>Explanation</h4>
+          <p>${escapeHtml(t.explanation)}</p>
+        </div>
+
+        <div class="block">
+          <h4>Steps</h4>
+          <ol>${stepsHtml}</ol>
+        </div>
+
+        <div class="block">
+          <h4>Code Example</h4>
+          <pre><code>${escapeHtml(t.code)}</code></pre>
+        </div>
+
+        ${t.videoLink ? `
+          <div class="block">
+            <a href="${escapeHtml(t.videoLink)}" class="video-link" target="_blank" rel="noopener noreferrer">
+              ▶ Watch Video
+            </a>
+          </div>
+        ` : ""}
+
+        <div class="rating-summary">
+          <span class="avg-number">${avg ? avg.toFixed(1) : "0.0"}/5</span>
+          <div class="display-stars">${renderStars(avg)}</div>
+          <span>${totalRatings} rating(s)</span>
+          <span class="like-count">❤️ ${totalLikes}</span>
+        </div>
+
+        <div class="vote-row">
+          ${isLoggedIn() ? `
+            <p>Rate this tutorial:</p>
+            <div class="star-buttons">
+              ${[1,2,3,4,5].map((n) => `
+                <button type="button" class="star-btn" data-id="${t._id}" data-rate="${n}">★ ${n}</button>
+              `).join("")}
+            </div>
+            <button type="button" class="like-btn" data-id="${t._id}">❤️ Like</button>
+          ` : `<p class="muted-action">Log in to rate or like</p>`}
+        </div>
+
+        <div class="comments">
+          <h4>Comments</h4>
+          <div class="comment-list">${commentsHtml}</div>
+
+          ${isLoggedIn() ? `
+            <div class="comment-form">
+              <textarea class="comment-text" rows="3" placeholder="Write a comment…"></textarea>
+              <button type="button" class="comment-btn" data-id="${t._id}">Post Comment</button>
+            </div>
+          ` : `<p class="muted-action">Log in to leave a comment</p>`}
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
-tutorialForm.addEventListener("submit", function (e) {
+// ─────────────────────────────────────────────────────────────────────────────
+//  LOAD TUTORIALS FROM BACKEND
+// ─────────────────────────────────────────────────────────────────────────────
+
+// FIX: Original loadTutorials() only read from localStorage.
+//      Now it fetches from the backend, falling back to an error state.
+async function loadTutorials() {
+  tutorialList.innerHTML = `<p class="empty-text">Loading…</p>`;
+  try {
+    const tutorials = await getAllTutorials();
+    renderTutorials(tutorials);
+  } catch (err) {
+    tutorialList.innerHTML = `
+      <p class="empty-text error-text">
+        ⚠️ Could not load tutorials.<br/>
+        Make sure the backend server is running on <code>http://localhost:5000</code>.
+      </p>
+    `;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PUBLISH TUTORIAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+tutorialForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearError(formError);
 
-  const title = document.getElementById("title").value.trim();
-  const author = document.getElementById("author").value.trim();
-  const explanation = document.getElementById("explanation").value.trim();
-  const steps = document
-    .getElementById("steps")
-    .value
-    .split("\n")
-    .map((step) => step.trim())
-    .filter(Boolean);
-  const code = document.getElementById("code").value.trim();
-
-  const newTutorial = {
-    id: generateId(),
-    title,
-    author,
-    explanation,
-    steps,
-    code,
-    ratings: [],
-    comments: []
-  };
-
-  tutorials.unshift(newTutorial);
-  saveTutorials();
-  renderTutorials();
-  tutorialForm.reset();
-});
-
-tutorialList.addEventListener("click", function (e) {
-  const rateButton = e.target.closest("[data-rate]");
-  const commentButton = e.target.closest(".comment-btn");
-
-  if (rateButton) {
-    const tutorialId = rateButton.dataset.id;
-    const ratingValue = Number(rateButton.dataset.rate);
-
-    const tutorial = tutorials.find((item) => item.id === tutorialId);
-    if (tutorial) {
-      tutorial.ratings.push(ratingValue);
-      saveTutorials();
-      renderTutorials();
-    }
+  if (!isLoggedIn()) {
+    openModal("login");
+    return;
   }
 
-  if (commentButton) {
-    const tutorialId = commentButton.dataset.id;
-    const tutorialCard = commentButton.closest(".tutorial-card");
-    const nameInput = tutorialCard.querySelector(".commenter-name");
-    const textInput = tutorialCard.querySelector(".comment-text");
+  const title       = document.getElementById("title").value.trim();
+  const explanation = document.getElementById("explanation").value.trim();
+  const stepsRaw    = document.getElementById("steps").value;
+  const code        = document.getElementById("code").value.trim();
+  const videoLink   = document.getElementById("videoLink").value.trim();
 
-    const name = nameInput.value.trim() || "Anonymous";
-    const text = textInput.value.trim();
+  // FIX: Split steps in the frontend so we send a clean array, not a raw string
+  const steps = stepsRaw.split("\n").map((s) => s.trim()).filter(Boolean);
 
+  if (!steps.length) {
+    showError(formError, "Please enter at least one step.");
+    return;
+  }
+
+  const submitBtn = tutorialForm.querySelector("button[type=submit]");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Publishing…";
+
+  try {
+    await createTutorial({ title, explanation, steps, code, videoLink });
+    tutorialForm.reset();
+    await loadTutorials(); // Refresh the list from the server
+  } catch (err) {
+    showError(formError, err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Publish Tutorial";
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EVENT DELEGATION — rate, like, comment, delete
+// ─────────────────────────────────────────────────────────────────────────────
+
+tutorialList.addEventListener("click", async (e) => {
+  // ─── Rate ──────────────────────────────────────────────────────────────────
+  const rateBtn = e.target.closest(".star-btn");
+  if (rateBtn) {
+    const id     = rateBtn.dataset.id;
+    const rating = Number(rateBtn.dataset.rate);
+    try {
+      await rateTutorial(id, rating);
+      await loadTutorials();
+    } catch (err) {
+      alert(err.message);
+    }
+    return;
+  }
+
+  // ─── Like ──────────────────────────────────────────────────────────────────
+  const likeBtn = e.target.closest(".like-btn");
+  if (likeBtn) {
+    try {
+      await likeTutorial(likeBtn.dataset.id);
+      await loadTutorials();
+    } catch (err) {
+      alert(err.message);
+    }
+    return;
+  }
+
+  // ─── Post comment ─────────────────────────────────────────────────────────
+  const commentBtn = e.target.closest(".comment-btn");
+  if (commentBtn) {
+    const card      = commentBtn.closest(".tutorial-card");
+    const textInput = card.querySelector(".comment-text");
+    const text      = textInput.value.trim();
     if (!text) return;
 
-    const tutorial = tutorials.find((item) => item.id === tutorialId);
-    if (tutorial) {
-      tutorial.comments.push({
-        name,
-        text,
-        date: new Date().toLocaleDateString()
-      });
-
-      saveTutorials();
-      renderTutorials();
+    commentBtn.disabled = true;
+    try {
+      await addComment(commentBtn.dataset.id, text);
+      textInput.value = "";
+      await loadTutorials();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      commentBtn.disabled = false;
     }
+    return;
+  }
+
+  // ─── Delete comment ───────────────────────────────────────────────────────
+  const delCommentBtn = e.target.closest(".del-comment-btn");
+  if (delCommentBtn) {
+    if (!confirm("Delete this comment?")) return;
+    try {
+      await deleteComment(delCommentBtn.dataset.tutorialId, delCommentBtn.dataset.commentId);
+      await loadTutorials();
+    } catch (err) {
+      alert(err.message);
+    }
+    return;
+  }
+
+  // ─── Delete tutorial ──────────────────────────────────────────────────────
+  const deleteBtn = e.target.closest(".delete-btn");
+  if (deleteBtn) {
+    if (!confirm("Delete this tutorial? This cannot be undone.")) return;
+    try {
+      await deleteTutorial(deleteBtn.dataset.id);
+      await loadTutorials();
+    } catch (err) {
+      alert(err.message);
+    }
+    return;
   }
 });
 
-renderTutorials();
+// ─────────────────────────────────────────────────────────────────────────────
+//  INITIALISE
+// ─────────────────────────────────────────────────────────────────────────────
+
+renderAuthBar();
+loadTutorials();
